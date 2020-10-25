@@ -3,26 +3,32 @@
 import csv
 import tkinter as tk
 import pandas as pd
-from gpiozero import LED
+# from gpiozero import LED
+from mtcnn import MTCNN
+from time import sleep
+import os
+
 
 top = tk.Tk() 
 top.geometry("600x450+343+144")
 top.configure(background="#282828")
-light = LED(17)
+# light = LED(17)
  
 Name_Entry , ID_Entry = " " , " "
-df = pd.read_csv("Database.csv")
+df = pd.read_csv("IFB-FaceReq-Attendance/Database.csv")
 name_list = list(df["NAME"])
 def clear_window(window):
     for ele in window.winfo_children():
         ele.destroy()
+
+n = 1 
 
         
 def image_capture():
     global Name_Entry
     global ID_Entry
     import cv2
-    light.on()
+    # light.on()
 
     check = False
 
@@ -36,37 +42,63 @@ def image_capture():
         print("Name already exists")
         check = True
     if check == False :
+
+        os.mkdir("IFB-FaceReq-Attendance/Faces/"+name)
+
         cam = cv2.VideoCapture(0)
 
-        cv2.namedWindow("test")
+        count = 1
+        detector = MTCNN()
 
 
         while True:
+
+            if  count == 21:
+                break
             ret, frame = cam.read()
             if not ret:
                 print("failed to grab frame")
                 break
-            cv2.imshow("test", frame)
 
-            k = cv2.waitKey(1)
-            if k%256 == 32:
-                # SPACE pressed
-                img_name = "Faces/{}.png".format(name)
-                cv2.imwrite(img_name, frame)
-                print("{} written!".format(img_name))
+            result = detector.detect_faces(frame)
+
+            if result != []:
+                for person in result:
+                    bounding_box = person['box']
+                
+                cv2.rectangle(frame,
+                          (bounding_box[0], bounding_box[1]),
+                          (bounding_box[0]+bounding_box[2], bounding_box[1] + bounding_box[3]),
+                          (0,155,255),
+                          2)
+
+                frame1 = frame[bounding_box[1]:bounding_box[1]+bounding_box[3], bounding_box[0]:bounding_box[0]+bounding_box[2]]
+        
+                img_name = "IFB-FaceReq-Attendance/Faces/{}/{}.png".format(name,ID+"-"+str(count))
+                try:
+                    cv2.imwrite(img_name, frame1)
+                    cv2.imshow(img_name, frame1)
+                    print("{} written!".format(img_name))
+                except:
+                    print("Could not capture that specific frame trying again")
+
+                count += 1
+            cv2.imshow("Capture", frame)
+            if cv2.waitKey(1) &0xFF == ord('q'):
                 break
+
 
         cam.release()
         
         cv2.destroyAllWindows()
-        light.off()
+        # light.off()
         
         Write(name,ID)
     else:
         Register()
 
 def Write(name,ID):
-    with open("Database.csv","a") as f:
+    with open("IFB-FaceReq-Attendance/Database.csv","a") as f:
         write = csv.writer(f)
         write.writerow([name,ID])
     Register() 
